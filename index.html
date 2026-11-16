@@ -1503,10 +1503,7 @@ footer p{margin:0;font-size:.76rem;color:var(--muted)}
     }
     k.add('payload', micG);
 
-    k.pin('eudragit', 1, P.eudragit, new THREE.Vector3(-0.25, R+0.1, 0.4), 0.46);
-    k.pin('hpmc',     2, P.hpmc,     new THREE.Vector3(0.62, R-0.2, 0.46), 0.46);
-    k.pin('azo',      3, P.azo,      new THREE.Vector3(-0.62, R-0.44, 0.42), 0.46);
-    k.pin('payload',  4, P.mic,      new THREE.Vector3(0.18, -0.1, 0.34), 0.42);
+    /* no numbered pins here: the four layers already read apart by colour */
 
     var camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
     camera.position.set(2.6, 1.5, 3.1);
@@ -1649,13 +1646,7 @@ footer p{margin:0;font-size:.76rem;color:var(--muted)}
     k.add('azide', azG);
     k.add('uro', uroG);
 
-    k.pin('peg',   1, P.peg,    new THREE.Vector3(0.0, 1.78, 0.25), 0.44);
-    k.pin('azide', 2, P.azide,  new THREE.Vector3(1.52, 0.62, 0.3), 0.44);
-    k.pin('uro',   3, P.uro,    new THREE.Vector3(-0.42, 1.48, 0.86), 0.44);
-    k.pin('core',  4, P.core,   new THREE.Vector3(-0.72, -0.52, 0.52), 0.44);
-    k.pin('dise',  5, P.dise,   new THREE.Vector3(0.72, -0.56, 0.46), 0.44);
-    k.pin('sn38',  6, P.sn38,   new THREE.Vector3(0.1, -0.28, 0.6), 0.4);
-    k.pin('dox',   7, P.dox,    new THREE.Vector3(0.52, 0.42, 0.62), 0.4);
+    /* no numbered pins here: the parts already read apart by colour */
 
     var camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
     camera.position.set(2.9, 1.9, 4.2);
