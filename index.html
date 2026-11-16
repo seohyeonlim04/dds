@@ -1,0 +1,932 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;font:14px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+img{max-width:100%}
+[hidden]{display:none!important}
+</style>
+<title>대장암 표적 Multi-Stimuli-Responsive Polymer DDS</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<style>
+/* Layout: sticky scale-selector header → split viewer (canvas left, numbered part list right) → mechanism strip */
+:root{
+  --bg:#f4f6f8; --surface:#ffffff; --surface-2:#eef1f5; --line:#d9dfe7;
+  --fg:#141a22; --fg-2:#45515f; --muted:#6b7886;
+  --accent:#16627a; --accent-soft:#e2eef2;
+  --stage-1:#e9eef3; --stage-2:#c4d1df;
+  --shadow:0 1px 2px rgba(16,30,45,.06), 0 8px 24px rgba(16,30,45,.07);
+  /* data colors — identical in both themes so the legend matches the 3D scene */
+  --c-eudragit:#00959e; --c-azo:#e0631b; --c-hpmc:#7b8a9c; --c-mic:#1f6fe0;
+  --c-peg:#1f6fe0; --c-azide:#7b2ff2; --c-uro:#00a05a; --c-core:#3d4f7d;
+  --c-dise:#e0a400; --c-hyd:#e6198c; --c-dox:#e0102f; --c-sn38:#f07000;
+  --font-display:'Space Grotesk','Noto Sans KR',system-ui,sans-serif;
+  --font-body:'Noto Sans KR','Space Grotesk',system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e1319; --surface:#161d26; --surface-2:#1d252f; --line:#2b3542;
+  --fg:#e8edf3; --fg-2:#b2bdc9; --muted:#8694a2;
+  --accent:#58c5dc; --accent-soft:#16303a;
+  --stage-1:#121a22; --stage-2:#1b2733;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 28px rgba(0,0,0,.35);
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0e1319; --surface:#161d26; --surface-2:#1d252f; --line:#2b3542;
+  --fg:#e8edf3; --fg-2:#b2bdc9; --muted:#8694a2;
+  --accent:#58c5dc; --accent-soft:#16303a;
+  --stage-1:#121a22; --stage-2:#1b2733;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 28px rgba(0,0,0,.35);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);line-height:1.65;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1240px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{font-family:var(--font-display);text-wrap:balance;margin:0}
+.eyebrow{font-family:var(--font-display);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:600}
+
+/* header */
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:11;background:var(--surface)}
+header.top{background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:env(safe-area-inset-top,0px);z-index:10}
+.top .wrap{padding-block:14px}
+.titleline{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px}
+h1{font-size:clamp(1.15rem,2.6vw,1.6rem);font-weight:700;letter-spacing:-.01em}
+.sub{color:var(--muted);font-size:.84rem}
+.tabs{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.tab{appearance:none;cursor:pointer;background:var(--surface-2);border:1px solid var(--line);color:var(--fg-2);
+  border-radius:999px;padding:7px 15px 7px 11px;font-family:var(--font-display);font-weight:600;font-size:.9rem;
+  display:inline-flex;align-items:center;gap:9px;transition:background .15s,color .15s,border-color .15s}
+.tab .lvl{font-size:.68rem;font-weight:700;letter-spacing:.06em;background:var(--surface);border:1px solid var(--line);
+  color:var(--muted);border-radius:999px;padding:1px 7px}
+.tab:hover{border-color:var(--accent)}
+.tab[aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.tab[aria-selected="true"] .lvl{background:rgba(255,255,255,.18);border-color:transparent;color:#fff}
+.tab:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* main split */
+main .wrap{padding-block:22px 10px}
+.split{display:grid;grid-template-columns:minmax(0,1.32fr) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:900px){.split{grid-template-columns:1fr}}
+
+/* stage */
+.stage{position:relative;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:
+  radial-gradient(120% 90% at 30% 10%,var(--stage-1),var(--stage-2));box-shadow:var(--shadow)}
+.stage .canvasbox{position:relative;width:100%;aspect-ratio:4/3.1}
+@media (max-width:620px){.stage .canvasbox{aspect-ratio:1/1.1}}
+canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+canvas.grabbing{cursor:grabbing}
+.scalebadge{position:absolute;top:12px;left:12px;background:var(--surface);border:1px solid var(--line);border-radius:10px;
+  padding:6px 10px;font-family:var(--font-display);font-size:.74rem;font-weight:600;color:var(--fg-2);
+  display:flex;gap:8px;align-items:center}
+.scalebadge b{color:var(--accent);font-variant-numeric:tabular-nums}
+.stagebar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;
+  padding:10px 12px;border-top:1px solid var(--line);background:var(--surface)}
+.hint{font-size:.78rem;color:var(--muted)}
+.hint kbd{font:inherit;font-weight:600;color:var(--fg-2);background:var(--surface-2);border:1px solid var(--line);
+  border-radius:5px;padding:1px 6px}
+.btns{display:flex;gap:7px}
+.btn{appearance:none;cursor:pointer;background:var(--surface-2);border:1px solid var(--line);color:var(--fg-2);
+  border-radius:8px;padding:6px 11px;font-family:var(--font-display);font-size:.8rem;font-weight:600}
+.btn:hover{border-color:var(--accent);color:var(--fg)}
+.btn[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* part list */
+.panel h2{font-size:1rem;font-weight:700;letter-spacing:-.01em}
+.panelhead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:4px}
+.panelnote{font-size:.78rem;color:var(--muted)}
+.parts{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+.part{width:100%;text-align:left;appearance:none;cursor:pointer;background:var(--surface);border:1px solid var(--line);
+  border-left:4px solid var(--pc);border-radius:12px;padding:11px 13px;display:grid;
+  grid-template-columns:26px minmax(0,1fr);gap:3px 11px;font:inherit;color:inherit;transition:border-color .15s,background .15s}
+.part:hover{background:var(--surface-2)}
+.part:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.part[aria-pressed="true"]{border-color:var(--pc);background:var(--surface-2);box-shadow:var(--shadow)}
+.num{grid-row:1/span 2;width:26px;height:26px;border-radius:50%;background:var(--pc);color:#fff;display:grid;place-items:center;
+  font-family:var(--font-display);font-weight:700;font-size:.82rem;margin-top:2px}
+.pname{font-family:var(--font-display);font-weight:600;font-size:.95rem;display:flex;flex-wrap:wrap;gap:6px;align-items:baseline}
+.pname .chem{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.76rem;color:var(--muted);font-weight:500}
+.pdesc{font-size:.855rem;color:var(--fg-2);margin:0}
+.pdesc em{color:var(--fg);font-style:normal;font-weight:600;background:linear-gradient(transparent 62%,var(--accent-soft) 62%)}
+
+/* mechanism */
+.mech{border-top:1px solid var(--line);margin-top:26px;background:var(--surface)}
+.mech .wrap{padding-block:26px 34px}
+.mech h2{font-size:1.1rem;margin-bottom:3px}
+.steps{list-style:none;margin:16px 0 0;padding:0;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;counter-reset:s}
+@media (max-width:1000px){.steps{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:620px){.steps{grid-template-columns:1fr}}
+.step{position:relative;border:1px solid var(--line);border-radius:12px;padding:12px 12px 13px;background:var(--bg);min-width:0}
+.step .sn{font-family:var(--font-display);font-size:.7rem;font-weight:700;color:var(--accent);letter-spacing:.08em}
+.step h3{font-size:.9rem;font-weight:600;margin:3px 0 5px}
+.step p{margin:0;font-size:.8rem;color:var(--fg-2)}
+.step .trig{display:inline-block;margin-top:8px;font-family:ui-monospace,Menlo,monospace;font-size:.7rem;
+  color:var(--fg-2);background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:2px 7px}
+.pairnote{margin-top:18px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (max-width:700px){.pairnote{grid-template-columns:1fr}}
+.card{border:1px solid var(--line);border-radius:12px;padding:13px 14px;background:var(--bg);min-width:0}
+.card h3{font-size:.9rem;margin-bottom:4px}
+.card p{margin:0;font-size:.82rem;color:var(--fg-2)}
+.swatch{display:inline-block;width:9px;height:9px;border-radius:3px;background:var(--pc);margin-right:6px;vertical-align:1px}
+footer{border-top:1px solid var(--line)}
+footer .wrap{padding-block:16px 26px}
+footer p{margin:0;font-size:.76rem;color:var(--muted)}
+.scaleline{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px;font-size:.75rem;color:var(--muted);
+  font-family:var(--font-display);font-variant-numeric:tabular-nums}
+.scaleline span{white-space:nowrap}
+.noscript{padding:14px;font-size:.85rem;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="titleline">
+      <h1>대장암 표적 Multi-Stimuli-Responsive Polymer DDS</h1>
+      <span class="sub">pH · azoreductase · GC-C 수용체 · GSH · 엔도솜 산성도에 순차 반응하는 경구 전달체</span>
+    </div>
+    <div class="tabs" role="tablist" aria-label="스케일 선택">
+      <button class="tab" role="tab" id="tab-capsule" aria-controls="view" aria-selected="true" data-view="capsule">
+        <span class="lvl">1</span>캡슐</button>
+      <button class="tab" role="tab" id="tab-nano" aria-controls="view" aria-selected="false" data-view="nano">
+        <span class="lvl">2</span>나노입자</button>
+      <button class="tab" role="tab" id="tab-chain" aria-controls="view" aria-selected="false" data-view="chain">
+        <span class="lvl">3</span>사슬</button>
+    </div>
+    <div class="scaleline">
+      <span>캡슐 ≈ 2 × 10⁻² m</span><span>→</span><span>나노입자 ≈ 1 × 10⁻⁷ m</span><span>→</span><span>반복 단위 ≈ 1 × 10⁻⁹ m</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+    <div class="split" id="view" role="tabpanel" aria-labelledby="tab-capsule">
+      <section class="stage">
+        <div class="canvasbox">
+          <canvas id="gl" aria-label="3D 구조 뷰어"></canvas>
+          <div class="scalebadge"><span id="scaleLabel">캡슐</span><b id="scaleSize">≈ 2 cm</b></div>
+        </div>
+        <div class="stagebar">
+          <p class="hint" id="hint"><kbd>드래그</kbd> 회전 · <kbd>스크롤</kbd> 확대 · <kbd>부분 클릭</kbd> 설명</p>
+          <div class="btns">
+            <button class="btn" id="spinBtn" aria-pressed="true">자동 회전</button>
+            <button class="btn" id="resetBtn">시점 초기화</button>
+            <button class="btn" id="allBtn">전체 보기</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panelhead">
+          <h2 id="panelTitle">캡슐</h2>
+        </div>
+        <p class="panelnote" id="panelNote">항목을 누르면 해당 부분만 강조됩니다.</p>
+        <ul class="parts" id="parts"></ul>
+      </section>
+    </div>
+  </div>
+
+  <section class="mech">
+    <div class="wrap">
+      <p class="eyebrow">Mechanism</p>
+      <ol class="steps">
+        <li class="step"><div class="sn">STEP 1</div><h3>위 통과</h3>
+          <p>Eudragit FS 30D 코팅이 산성 위에서 유지되어 조기 방출을 막는다.</p><span class="trig">pH 1–3 : 코팅 유지</span></li>
+        <li class="step"><div class="sn">STEP 2</div><h3>장에서 코팅 용해</h3>
+          <p>pH가 올라가면 장용 코팅이 풀리고, 안쪽의 HPMC 캡슐이 수화되어 열린다.</p><span class="trig">pH &gt; 7 : 코팅 용해</span></li>
+        <li class="step"><div class="sn">STEP 3</div><h3>대장 확인</h3>
+          <p>대장 미생물이 분비하는 azoreductase가 azo 결합을 끊어 층을 분해 — 나노입자가 풀려난다.</p><span class="trig">azoreductase : –N=N– 절단</span></li>
+        <li class="step"><div class="sn">STEP 4</div><h3>암세포 표적</h3>
+          <p>방출된 미셀의 UroG가 대장암 세포에 과발현된 GC-C 수용체에 결합한다.</p><span class="trig">UroG–GC-C : 수용체 매개 흡수</span></li>
+        <li class="step"><div class="sn">STEP 5</div><h3>세포 안 두 절단</h3>
+          <p>엔도솜 산성에서 hydrazone이, 세포질 환원 환경에서 diselenide가 끊긴다.</p><span class="trig">pH 5–6 / GSH 100–1000×</span></li>
+        <li class="step"><div class="sn">STEP 6</div><h3>약물의 순차적 병용</h3>
+          <p>DOX가 먼저, 코어가 느슨해진 뒤 SN-38이 확산으로 따라 나온다.</p><span class="trig">topo II + topo I</span></li>
+      </ol>
+
+      <div class="pairnote">
+        <div class="card" style="--pc:var(--c-dox)">
+          <h3><span class="swatch"></span>DOX — 공유결합, 산 감응</h3>
+          <p>Asp 측쇄에 hydrazone으로 결합되어 있어 엔도솜의 산성 조건에서 결합이 끊어질 때만 방출된다. Topoisomerase II를 저해한다.</p>
+        </div>
+        <div class="card" style="--pc:var(--c-sn38)">
+          <h3><span class="swatch"></span>SN-38 — 물리적 봉입, 환원 감응</h3>
+          <p>코어에 봉입되어 diselenide 가교가 풀린 뒤 확산으로 나온다. 산성에서는 diselenide가 오히려 잘 끊기지 않아 DOX보다 늦게 방출되고, 특정 시점의 과도한 농도 상승이 완화된다. Topoisomerase I을 저해해 DOX와 작용 기전이 겹치지 않는다.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>그림은 각 부분의 구성과 연결 관계를 보여주기 위한 도식으로, 실제 분자 구조와 크기 비율을 그대로 나타낸 것은 아닙니다. 세 뷰의 스케일 차이는 약 10⁵배(캡슐↔나노입자)와 10²배(나노입자↔사슬)입니다.</p>
+  </div>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+  var canvas = document.getElementById('gl');
+  if (!window.THREE) {
+    canvas.insertAdjacentHTML('afterend','<p class="noscript">3D 뷰어를 불러오지 못했습니다. 네트워크 연결을 확인하고 새로고침해 주세요.</p>');
+    return;
+  }
+  var css = getComputedStyle(document.documentElement);
+  function C(name, fallback){ var v = css.getPropertyValue(name).trim(); return v || fallback; }
+  var P = {
+    eudragit:C('--c-eudragit','#1f9aa3'), azo:C('--c-azo','#d2703a'), hpmc:C('--c-hpmc','#8d9bab'),
+    mic:C('--c-mic','#4f82e8'), peg:C('--c-peg','#4f82e8'), azide:C('--c-azide','#7a5ce0'),
+    uro:C('--c-uro','#1f9a62'), core:C('--c-core','#5a6a8e'), dise:C('--c-dise','#cfa41f'),
+    hyd:C('--c-hyd','#bf3395'), dox:C('--c-dox','#d42440'), sn38:C('--c-sn38','#e07c22')
+  };
+
+  /* ---------- content ---------- */
+  var VIEWS = {
+    capsule:{
+      label:'캡슐', size:'≈ 2 cm', title:'캡슐',
+      parts:[
+        {id:'eudragit', color:P.eudragit, name:'Eudragit FS 30D 장용 코팅', chem:'pH-responsive',
+         desc:'가장 바깥의 장용 코팅. <em>pH가 7보다 높은 환경에서만 녹아</em> 위(pH 1~3)에서의 조기 방출을 막는다. 실제로 대장의 일부 구간은 pH가 7보다 낮고 소장 말단은 7을 넘기도 하므로, 이 코팅의 역할은 위를 안전하게 통과시켜 장까지 보내는 데 있다.'},
+        {id:'hpmc', color:P.hpmc, name:'HPMC 캡슐', chem:'hydroxypropyl methylcellulose',
+         desc:'장용 코팅 바로 안쪽의 식물성 캡슐 쉘. 코팅이 녹은 뒤 수화되어 열리면서, 안에 들어 있던 azo polymer를 장 내용물에 노출시킨다.'},
+        {id:'azo', color:P.azo, name:'Azo polymer', chem:'HEMA : MMA = 6 : 1, 가교제 BMAAB',
+         desc:'캡슐 안에서 나노입자를 붙들고 있는 가장 안쪽 층. 대장에 서식하는 미생물이 분비하는 <em>azoreductase가 azo(–N=N–) 결합을 절단</em>해 이 층이 분해되고, 그때 비로소 나노입자가 풀려난다. 층이 분해되었다는 것은 곧 대장에 도달했다는 뜻이다. 친수성 HEMA와 소수성 MMA를 6 : 1로 섞어 수화 정도와 분해 속도를 조절한다.'},
+        {id:'payload', color:P.mic, name:'봉입된 나노입자', chem:'self-assembled micelle',
+         desc:'azo polymer 안에 자기조립 고분자 미셀이 다수 들어 있다. <em>캡슐은 cm, 미셀은 100 nm 규모</em>로 약 10⁵배의 스케일 차이가 있어 이 그림에서는 작은 구슬로 표시했다. 다음 탭에서 미셀 한 개를 확대해 본다.'}
+      ]
+    },
+    nano:{
+      label:'나노입자', size:'≈ 100 nm', title:'나노입자',
+      parts:[
+        {id:'peg', color:P.peg, name:'mPEG corona', chem:'mPEG-P[Asp-(Hyd-DOX)]',
+         desc:'입자 바깥을 덮는 친수성 PEG 층. 응집과 비특이 흡착을 줄여 입자를 안정하게 유지한다. 다만 <em>mPEG의 methoxy 말단은 반응성이 없어 리간드를 접합할 수 없다.</em>'},
+        {id:'azide', color:P.azide, name:'N₃-PEG + SPAAC 접합점', chem:'N₃-PEG-P[Asp-(Hyd-DOX)] → triazole',
+         desc:'그래서 말단을 <em>azide로 치환한 N₃-PEG</em>를 함께 자기조립시킨다. 이 azide에 구리를 쓰지 않는 <em>SPAAC 클릭 반응</em>으로 리간드를 붙이고, 반응 결과 생긴 triazole 고리가 접합점이 된다.'},
+        {id:'uro', color:P.uro, name:'UroG 리간드 — GC-C 표적', chem:'uroguanylin',
+         desc:'접합된 UroG가 <em>대장암 세포 표면에 과발현된 GC-C 수용체</em>에 결합한다. 수용체를 매개로 DDS 구조 전체가 암세포 내부로 들어간다.'},
+        {id:'core', color:P.core, name:'소수성 코어', chem:'P[Asp-(Hyd-DOX)]',
+         desc:'DOX가 결합된 소수성 Asp 블록이 안쪽으로 모여 코어를 이룬다. 이 소수성이 자기조립의 구동력이고, 동시에 SN-38을 담는 공간이 된다.'},
+        {id:'dise', color:P.dise, name:'Diselenide 가교', chem:'–Se–Se–',
+         desc:'코어를 묶는 환원 감응 결합. <em>세포 내 GSH 농도는 세포 밖보다 100~1000배 높아</em> 세포 안에서 Se–Se가 절단되고, 코어가 느슨해져 봉입된 약물이 빠져나올 수 있다.'},
+        {id:'sn38', color:P.sn38, name:'봉입된 SN-38', chem:'topo I 저해제',
+         desc:'코어의 소수성 공간에 <em>물리적으로 봉입</em>되어 있다. 공유결합이 아니므로 가교가 풀려 코어가 느슨해지면 확산으로 방출된다.'},
+        {id:'dox', color:P.dox, name:'결합된 DOX', chem:'topo II 저해제',
+         desc:'Asp 측쇄에 hydrazone으로 공유결합된 상태로 코어 안에 분포한다. 결합이 끊어지지 않으면 방출되지 않는다 — 결합 부위는 다음 탭에서 확대.'}
+      ]
+    },
+    chain:{
+      label:'사슬', size:'반복 단위 ≈ 1 nm', title:'사슬',
+      parts:[
+        {id:'uroc', color:P.uro, name:'UroG + triazole 말단', chem:'SPAAC 생성물',
+         desc:'N₃-PEG 말단의 azide와 strained alkyne이 만나 생긴 <em>triazole 고리</em>를 통해 UroG가 사슬 끝에 고정된다. 자기조립 후 이 말단이 입자 표면으로 올라와 수용체와 만난다.'},
+        {id:'pegc', color:P.peg, name:'PEG 블록', chem:'친수성 블록',
+         desc:'물에 잘 녹는 블록으로, 자기조립 시 바깥 corona를 형성한다. 말단이 methoxy인 mPEG와 azide인 N₃-PEG를 섞어 쓴다.'},
+        {id:'disec', color:P.dise, name:'Diselenide bond', chem:'–Se–Se– · GSH 감응',
+         desc:'친수성 블록과 소수성 블록 사이를 잇는 결합. <em>높은 GSH 농도에서 절단</em>되어 사슬이 둘로 나뉘고 코어 구조가 풀린다. 산성 조건에서는 오히려 잘 끊기지 않는다.'},
+        {id:'backbone', color:P.core, name:'Poly(Asp) 백본', chem:'P[Asp]',
+         desc:'측쇄에 카복실기를 가진 폴리아스파르트산 골격. 측쇄마다 약물을 매달 수 있어 <em>한 사슬이 여러 분자의 DOX</em>를 운반한다.'},
+        {id:'hyd', color:P.hyd, name:'Hydrazone bond', chem:'C=N–NH · pH 감응',
+         desc:'Asp 측쇄와 DOX를 잇는 결합. <em>엔도솜의 산성 환경(pH 5~6)에서 가수분해</em>되어 DOX와의 결합이 끊어진다. 혈중 중성 pH에서는 비교적 안정하다.'},
+        {id:'doxc', color:P.dox, name:'DOX (공유결합)', chem:'doxorubicin',
+         desc:'hydrazone으로 측쇄에 묶여 있어 <em>산성 조건에서 결합이 끊겨야만 방출</em>된다. 방출 후 topoisomerase II를 저해한다.'},
+        {id:'sn38c', color:P.sn38, name:'SN-38 (물리적 봉입)', chem:'SN-38',
+         desc:'사슬에 결합되지 않고 코어 소수성 공간에 끼어 있다. <em>diselenide가 풀리면 확산으로</em> 빠져나오며, topoisomerase I을 저해해 DOX와 기전이 겹치지 않는다.'}
+      ]
+    }
+  };
+
+  /* ---------- three.js setup ---------- */
+  var renderer = new THREE.WebGLRenderer({canvas:canvas, antialias:true, alpha:true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+  if (THREE.sRGBEncoding) renderer.outputEncoding = THREE.sRGBEncoding;
+
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var rngState = 1;
+  function srand(seed){ rngState = seed>>>0; }
+  function rnd(){ rngState = (rngState*1664525 + 1013904223) >>> 0; return rngState/4294967296; }
+  function rr(a,b){ return a + (b-a)*rnd(); }
+
+  function lights(scene){
+    /* restrained fill so the part colours stay saturated instead of washing out */
+    scene.add(new THREE.AmbientLight(0xffffff, 0.26));
+    var hemi = new THREE.HemisphereLight(0xeaf4ff, 0x2a3340, 0.34); scene.add(hemi);
+    var d1 = new THREE.DirectionalLight(0xffffff, 0.92); d1.position.set(5,7,6); scene.add(d1);
+    var d2 = new THREE.DirectionalLight(0xcfe0ff, 0.34); d2.position.set(-6,-3,-4); scene.add(d2);
+    var d3 = new THREE.DirectionalLight(0xffffff, 0.3); d3.position.set(-2,4,-7); scene.add(d3);
+  }
+
+  function rod(a,b,radius,mat){
+    var dir = new THREE.Vector3().subVectors(b,a), len = dir.length();
+    var m = new THREE.Mesh(new THREE.CylinderGeometry(radius,radius,len,10,1), mat);
+    m.position.copy(a).add(b).multiplyScalar(0.5);
+    m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir.clone().normalize());
+    return m;
+  }
+  function ball(pos,r,mat,seg){ var m=new THREE.Mesh(new THREE.SphereGeometry(r,seg||20,seg?Math.round(seg/2):14),mat); m.position.copy(pos); return m; }
+  function tube(pts,r,mat,seg){
+    var curve = new THREE.CatmullRomCurve3(pts);
+    return new THREE.Mesh(new THREE.TubeGeometry(curve, seg||26, r, 8, false), mat);
+  }
+  function capsuleShell(r, L, mat){
+    var g = new THREE.Group();
+    var cyl = new THREE.Mesh(new THREE.CylinderGeometry(r,r,L,56,1,true), mat); cyl.rotation.z = Math.PI/2; g.add(cyl);
+    var hp = new THREE.SphereGeometry(r,56,24,0,Math.PI*2,0,Math.PI/2);
+    var a = new THREE.Mesh(hp,mat); a.rotation.z = -Math.PI/2; a.position.x =  L/2; g.add(a);
+    var b = new THREE.Mesh(hp,mat); b.rotation.z =  Math.PI/2; b.position.x = -L/2; g.add(b);
+    return g;
+  }
+  function pin(num, color){
+    var c = document.createElement('canvas'); c.width = c.height = 128;
+    var g = c.getContext('2d');
+    g.beginPath(); g.arc(64,64,50,0,Math.PI*2); g.fillStyle = color; g.fill();
+    g.lineWidth = 9; g.strokeStyle = 'rgba(255,255,255,.95)'; g.stroke();
+    g.fillStyle = '#fff'; g.font = 'bold 66px Helvetica, Arial, sans-serif';
+    g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(num), 64, 69);
+    var tex = new THREE.CanvasTexture(c);
+    if (THREE.sRGBEncoding) tex.encoding = THREE.sRGBEncoding;
+    var mat = new THREE.SpriteMaterial({map:tex, transparent:true, depthTest:false});
+    var s = new THREE.Sprite(mat); s.renderOrder = 999;
+    return {sprite:s, mat:mat};
+  }
+
+  /* builder context: registers materials + pins per part id */
+  function ctx(scene){
+    var reg = {}, pinList = [];
+    return {
+      scene:scene, reg:reg, pins:pinList,
+      mat:function(partId, params, opts){
+        var m = new THREE.MeshStandardMaterial(params);
+        var entry = reg[partId] || (reg[partId] = []);
+        entry.push({mat:m, opacity:(params.opacity===undefined?1:params.opacity), emissive:(params.emissiveIntensity===undefined?1:params.emissiveIntensity)});
+        if (!params.emissive) m.emissive = new THREE.Color(params.color);
+        m.emissiveIntensity = params.emissiveIntensity===undefined ? 0 : params.emissiveIntensity;
+        /* the palette is written in sRGB; convert it so the renderer does not wash it out */
+        if (m.color && m.color.convertSRGBToLinear) m.color.convertSRGBToLinear();
+        if (m.emissive && m.emissive.convertSRGBToLinear) m.emissive.convertSRGBToLinear();
+        if (opts && opts.noDepth) m.depthWrite = false;
+        return m;
+      },
+      add:function(partId, obj){
+        obj.traverse(function(o){ o.userData.part = partId; });
+        obj.userData.part = partId;
+        scene.add(obj);
+        return obj;
+      },
+      pin:function(partId, num, color, pos, scale){
+        var p = pin(num, color);
+        p.sprite.position.copy(pos);
+        var s = scale || 0.5; p.sprite.scale.set(s,s,1);
+        p.sprite.userData.part = partId;
+        var entry = reg[partId] || (reg[partId] = []);
+        entry.push({mat:p.mat, opacity:1, emissive:0});
+        pinList.push({sprite:p.sprite, base:s});
+        scene.add(p.sprite);
+        return p.sprite;
+      }
+    };
+  }
+
+  /* ---------- scene 1 : capsule ---------- */
+  function buildCapsule(){
+    var scene = new THREE.Scene(); lights(scene);
+    var k = ctx(scene); srand(7);
+    var R = 0.78, L = 1.7;
+
+    var mEu = k.mat('eudragit', {color:P.eudragit, transparent:true, opacity:0.17, roughness:0.25, metalness:0.05,
+      side:THREE.DoubleSide, emissiveIntensity:0}, {noDepth:true});
+    k.add('eudragit', capsuleShell(R, L, mEu));
+
+    /* HPMC capsule shell, immediately inside the enteric coating */
+    var mH = k.mat('hpmc', {color:P.hpmc, transparent:true, opacity:0.34, roughness:0.55, side:THREE.DoubleSide}, {noDepth:true});
+    k.add('hpmc', capsuleShell(R-0.1, L, mH));
+    /* cap: slightly wider sleeve over one half */
+    var mH2 = k.mat('hpmc', {color:P.hpmc, transparent:true, opacity:0.44, roughness:0.5, side:THREE.DoubleSide}, {noDepth:true});
+    var capG = new THREE.Group();
+    var sleeve = new THREE.Mesh(new THREE.CylinderGeometry(R-0.07,R-0.07,L*0.52,48,1,true), mH2);
+    sleeve.rotation.z = Math.PI/2; sleeve.position.x = L*0.26 - 0.02; capG.add(sleeve);
+    var capEnd = new THREE.Mesh(new THREE.SphereGeometry(R-0.07,48,24,0,Math.PI*2,0,Math.PI/2), mH2);
+    capEnd.rotation.z = -Math.PI/2; capEnd.position.x = L/2; capG.add(capEnd);
+    k.add('hpmc', capG);
+
+    /* azo polymer matrix, the innermost layer holding the nanoparticles */
+    var mAzo = k.mat('azo', {color:P.azo, transparent:true, opacity:0.34, roughness:0.4, side:THREE.DoubleSide}, {noDepth:true});
+    k.add('azo', capsuleShell(R-0.26, L*0.97, mAzo));
+    /* azo (-N=N-) units decorating the layer */
+    var azoG = new THREE.Group();
+    var mN = k.mat('azo', {color:'#a8360a', roughness:0.28, metalness:0.1});
+    for (var i=0;i<14;i++){
+      var th = rr(0,Math.PI*2), ph = Math.acos(rr(-1,1)), rr0 = R-0.26;
+      var dirv = new THREE.Vector3(Math.sin(ph)*Math.cos(th), Math.sin(ph)*Math.sin(th), Math.cos(ph));
+      var base = dirv.clone().multiplyScalar(rr0); base.x *= 1.0;
+      if (Math.abs(base.x) > L/2) base.x = Math.sign(base.x)*(L/2) + (base.x - Math.sign(base.x)*L/2)*0.3;
+      var tangent = new THREE.Vector3(0,1,0).cross(dirv).normalize().multiplyScalar(0.085);
+      var a = base.clone().sub(tangent), b = base.clone().add(tangent);
+      azoG.add(ball(a,0.052,mN,12)); azoG.add(ball(b,0.052,mN,12));
+      var off = dirv.clone().cross(tangent).normalize().multiplyScalar(0.018);
+      azoG.add(rod(a.clone().add(off), b.clone().add(off), 0.012, mN));
+      azoG.add(rod(a.clone().sub(off), b.clone().sub(off), 0.012, mN));
+    }
+    k.add('azo', azoG);
+
+    /* payload: micelles held inside the azo matrix */
+    var mMic = k.mat('payload', {color:P.mic, roughness:0.35, metalness:0.08});
+    var mMicCore = k.mat('payload', {color:P.dox, roughness:0.4});
+    var micG = new THREE.Group();
+    for (var j=0;j<74;j++){
+      var x = rr(-L/2-0.26, L/2+0.26), rad = R-0.34;
+      var lim = Math.abs(x) > L/2 ? Math.sqrt(Math.max(0, rad*rad - Math.pow(Math.abs(x)-L/2,2))) : rad;
+      var a2 = rr(0,Math.PI*2), rd = Math.sqrt(rnd())*lim*0.94;
+      var pos = new THREE.Vector3(x, Math.cos(a2)*rd, Math.sin(a2)*rd);
+      micG.add(ball(pos, 0.058, mMic, 14));
+      if (j%3===0) micG.add(ball(pos, 0.03, mMicCore, 10));
+    }
+    k.add('payload', micG);
+
+    k.pin('eudragit', 1, P.eudragit, new THREE.Vector3(-0.25, R+0.1, 0.4), 0.46);
+    k.pin('hpmc',     2, P.hpmc,     new THREE.Vector3(0.62, R-0.2, 0.46), 0.46);
+    k.pin('azo',      3, P.azo,      new THREE.Vector3(-0.62, R-0.44, 0.42), 0.46);
+    k.pin('payload',  4, P.mic,      new THREE.Vector3(0.18, -0.1, 0.34), 0.42);
+
+    var camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+    camera.position.set(2.6, 1.5, 3.1);
+    return {scene:scene, camera:camera, reg:k.reg, pins:k.pins, target:new THREE.Vector3(0,0,0),
+            spin:0.5, fitW:2.0, fitH:1.4, rotatable:true};
+  }
+
+  /* ---------- scene 2 : nanoparticle ---------- */
+  function buildNano(){
+    var scene = new THREE.Scene(); lights(scene);
+    var k = ctx(scene); srand(21);
+    var CR = 1.0;
+
+    /* core shell: only the far side is drawn, so nothing veils the drugs inside */
+    var mCore = k.mat('core', {color:P.core, transparent:true, opacity:0.5, roughness:0.4, side:THREE.BackSide}, {noDepth:true});
+    k.add('core', new THREE.Mesh(new THREE.SphereGeometry(CR, 54, 34), mCore));
+    var mBone = k.mat('core', {color:P.core, roughness:0.45});
+    var boneG = new THREE.Group();
+    for (var i=0;i<16;i++){
+      var pts=[], p0 = new THREE.Vector3(rr(-.7,.7),rr(-.7,.7),rr(-.7,.7));
+      for (var s=0;s<5;s++){
+        pts.push(p0.clone());
+        p0 = p0.clone().add(new THREE.Vector3(rr(-.45,.45),rr(-.45,.45),rr(-.45,.45)));
+        if (p0.length()>CR*0.86) p0.multiplyScalar(CR*0.86/p0.length());
+      }
+      boneG.add(tube(pts, 0.028, mBone, 22));
+    }
+    k.add('core', boneG);
+
+    /* DOX bound in core */
+    var mDox = k.mat('dox', {color:P.dox, roughness:0.35, metalness:0.1});
+    var mDoxS = k.mat('dox', {color:'#ff7b93', roughness:0.4});
+    function doxMol(){
+      var g = new THREE.Group();
+      for (var n=0;n<3;n++){
+        var b = new THREE.Mesh(new THREE.BoxGeometry(0.13,0.045,0.12), mDox);
+        b.position.x = (n-1)*0.115; g.add(b);
+      }
+      g.add(ball(new THREE.Vector3(0.2,-0.07,0.02), 0.045, mDoxS, 12));
+      return g;
+    }
+    var doxG = new THREE.Group();
+    for (var d=0; d<26; d++){
+      var m = doxMol();
+      var th = rr(0,Math.PI*2), ph = Math.acos(rr(-1,1)), rd = Math.pow(rnd(),0.5)*CR*0.82;
+      m.position.set(rd*Math.sin(ph)*Math.cos(th), rd*Math.sin(ph)*Math.sin(th), rd*Math.cos(ph));
+      m.rotation.set(rr(0,6.28), rr(0,6.28), rr(0,6.28));
+      doxG.add(m);
+    }
+    k.add('dox', doxG);
+
+    /* SN-38 physically entrapped */
+    var mSn = k.mat('sn38', {color:P.sn38, roughness:0.3, metalness:0.12});
+    function snMol(){
+      var g = new THREE.Group();
+      [[0,0,0],[0.11,0,0.03],[0.2,0.02,-0.04],[0.07,0.03,-0.1]].forEach(function(p){
+        var b = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.04,0.1), mSn);
+        b.position.set(p[0],p[1],p[2]); b.rotation.y = 0.5; g.add(b);
+      });
+      return g;
+    }
+    var snG = new THREE.Group();
+    for (var q=0;q<16;q++){
+      var mm = snMol();
+      var th2 = rr(0,Math.PI*2), ph2 = Math.acos(rr(-1,1)), rd2 = Math.pow(rnd(),0.6)*CR*0.62;
+      mm.position.set(rd2*Math.sin(ph2)*Math.cos(th2), rd2*Math.sin(ph2)*Math.sin(th2), rd2*Math.cos(ph2));
+      mm.rotation.set(rr(0,6.28), rr(0,6.28), rr(0,6.28));
+      snG.add(mm);
+    }
+    k.add('sn38', snG);
+
+    /* diselenide crosslinks */
+    var mSe = k.mat('dise', {color:P.dise, roughness:0.22, metalness:0.35});
+    var seG = new THREE.Group();
+    for (var e=0;e<14;e++){
+      var th3 = rr(0,Math.PI*2), ph3 = Math.acos(rr(-1,1)), rd3 = rr(CR*0.55, CR*0.95);
+      var c0 = new THREE.Vector3(rd3*Math.sin(ph3)*Math.cos(th3), rd3*Math.sin(ph3)*Math.sin(th3), rd3*Math.cos(ph3));
+      var t = new THREE.Vector3(rr(-1,1),rr(-1,1),rr(-1,1)).normalize().multiplyScalar(0.082);
+      var a3 = c0.clone().sub(t), b3 = c0.clone().add(t);
+      seG.add(ball(a3,0.072,mSe,16)); seG.add(ball(b3,0.072,mSe,16));
+      seG.add(rod(a3,b3,0.03,mSe));
+    }
+    k.add('dise', seG);
+
+    /* PEG corona */
+    var mPeg = k.mat('peg', {color:P.peg, roughness:0.35});
+    var mOMe = k.mat('peg', {color:'#9ab2d8', roughness:0.5});
+    var pegG = new THREE.Group();
+    var N = 46;
+    for (var c=0;c<N;c++){
+      var y = 1 - (c+0.5)*2/N, rxy = Math.sqrt(Math.max(0,1-y*y)), ga = c*2.399963;
+      var dir = new THREE.Vector3(Math.cos(ga)*rxy, y, Math.sin(ga)*rxy).normalize();
+      var side = new THREE.Vector3(-dir.z,0,dir.x).normalize();
+      var up = new THREE.Vector3().crossVectors(dir, side).normalize();
+      var pts=[dir.clone().multiplyScalar(CR*0.97)];
+      var wig = rr(0.1,0.24);
+      for (var t2=1;t2<=4;t2++){
+        var len = CR + t2*0.2 + rr(-0.02,0.04);
+        pts.push(dir.clone().multiplyScalar(len)
+          .add(side.clone().multiplyScalar(Math.sin(t2*1.7)*wig))
+          .add(up.clone().multiplyScalar(Math.cos(t2*1.3)*wig*0.7)));
+      }
+      pegG.add(tube(pts, 0.033, mPeg, 20));
+      pegG.add(ball(pts[pts.length-1], 0.055, mOMe, 12));
+    }
+    k.add('peg', pegG);
+
+    /* N3-PEG chains + triazole + UroG */
+    var mAz = k.mat('azide', {color:P.azide, roughness:0.32});
+    var mTri = k.mat('azide', {color:'#b06bff', roughness:0.3, metalness:0.15});
+    var mUro = k.mat('uro', {color:P.uro, roughness:0.35, metalness:0.1});
+    var azG = new THREE.Group(), uroG = new THREE.Group();
+    var dirs = [[0.92,0.35,0.15],[-0.3,0.85,0.42],[0.25,-0.2,0.94],[-0.85,0.1,-0.5],
+                [0.15,-0.85,-0.5],[-0.45,-0.5,0.74],[0.6,0.55,-0.58],[-0.6,0.45,-0.66]];
+    dirs.forEach(function(dv){
+      var dir = new THREE.Vector3(dv[0],dv[1],dv[2]).normalize();
+      var side = new THREE.Vector3(-dir.z,0,dir.x).normalize();
+      var pts=[dir.clone().multiplyScalar(CR*0.97)];
+      for (var t3=1;t3<=4;t3++){
+        pts.push(dir.clone().multiplyScalar(CR + t3*0.215)
+          .add(side.clone().multiplyScalar(Math.sin(t3*1.5)*0.14)));
+      }
+      azG.add(tube(pts, 0.03, mAz, 20));
+      var tip = pts[pts.length-1];
+      var tri = new THREE.Mesh(new THREE.TorusGeometry(0.075,0.027,10,16), mTri);
+      tri.position.copy(tip); tri.lookAt(tip.clone().add(dir)); azG.add(tri);
+      /* UroG peptide knot */
+      var base = tip.clone().add(dir.clone().multiplyScalar(0.17));
+      var knot = new THREE.Group();
+      var kp = [[0,0,0],[0.1,0.07,0.03],[0.04,0.14,-0.07],[-0.08,0.06,-0.1],[-0.05,-0.06,0.05]];
+      var prev = null;
+      kp.forEach(function(p){
+        var v = new THREE.Vector3(p[0],p[1],p[2]);
+        knot.add(ball(v, 0.062, mUro, 14));
+        if (prev) knot.add(rod(prev, v, 0.024, mUro));
+        prev = v;
+      });
+      knot.position.copy(base); uroG.add(knot);
+    });
+    k.add('azide', azG);
+    k.add('uro', uroG);
+
+    k.pin('peg',   1, P.peg,    new THREE.Vector3(0.0, 1.78, 0.25), 0.44);
+    k.pin('azide', 2, P.azide,  new THREE.Vector3(1.52, 0.62, 0.3), 0.44);
+    k.pin('uro',   3, P.uro,    new THREE.Vector3(-0.42, 1.48, 0.86), 0.44);
+    k.pin('core',  4, P.core,   new THREE.Vector3(-0.72, -0.52, 0.52), 0.44);
+    k.pin('dise',  5, P.dise,   new THREE.Vector3(0.72, -0.56, 0.46), 0.44);
+    k.pin('sn38',  6, P.sn38,   new THREE.Vector3(0.1, -0.28, 0.6), 0.4);
+    k.pin('dox',   7, P.dox,    new THREE.Vector3(0.52, 0.42, 0.62), 0.4);
+
+    var camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+    camera.position.set(2.9, 1.9, 4.2);
+    return {scene:scene, camera:camera, reg:k.reg, pins:k.pins, target:new THREE.Vector3(0,0,0),
+            spin:0.42, fitW:2.25, fitH:2.25, rotatable:false};
+  }
+
+  /* ---------- scene 3 : single chain ---------- */
+  function buildChain(){
+    var scene = new THREE.Scene(); lights(scene);
+    var k = ctx(scene); srand(33);
+
+    var mUro = k.mat('uroc', {color:P.uro, roughness:0.35, metalness:0.1});
+    var mTri = k.mat('uroc', {color:'#b06bff', roughness:0.3, metalness:0.18});
+    var mPeg = k.mat('pegc', {color:P.peg, roughness:0.35});
+    var mSe  = k.mat('disec',{color:P.dise, roughness:0.2, metalness:0.4});
+    var mBb  = k.mat('backbone',{color:P.core, roughness:0.42});
+    var mSide= k.mat('backbone',{color:'#64779f', roughness:0.45});
+    var mHyd = k.mat('hyd',  {color:P.hyd, roughness:0.3, metalness:0.12});
+    var mDox = k.mat('doxc', {color:P.dox, roughness:0.33, metalness:0.1});
+    var mDoxS= k.mat('doxc', {color:'#ff7b93', roughness:0.4});
+    var mSn  = k.mat('sn38c',{color:P.sn38, roughness:0.3, metalness:0.12});
+
+    /* UroG knot + triazole at the far left */
+    var uroG = new THREE.Group();
+    var knotPts = [[-6.25,0.1,0],[-6.1,0.3,0.12],[-5.95,0.08,-0.14],[-6.18,-0.14,0.06],[-5.92,-0.22,0.16]];
+    var prev=null;
+    knotPts.forEach(function(p){
+      var v = new THREE.Vector3(p[0],p[1],p[2]);
+      uroG.add(ball(v,0.17,mUro,18));
+      if (prev) uroG.add(rod(prev,v,0.065,mUro));
+      prev=v;
+    });
+    uroG.add(rod(new THREE.Vector3(-5.9,-0.08,0.05), new THREE.Vector3(-5.5,0,0), 0.055, mUro));
+    var tri = new THREE.Mesh(new THREE.TorusGeometry(0.2,0.065,12,20), mTri);
+    tri.position.set(-5.3,0,0); tri.rotation.y = Math.PI/2; uroG.add(tri);
+    k.add('uroc', uroG);
+
+    /* PEG block : zig-zag beads */
+    var pegG = new THREE.Group();
+    var pegPts=[];
+    for (var i=0;i<13;i++){ pegPts.push(new THREE.Vector3(-5.05 + i*0.24, (i%2?0.11:-0.11), (i%4<2?0.05:-0.05))); }
+    for (var i2=0;i2<pegPts.length;i2++){
+      pegG.add(ball(pegPts[i2],0.105,mPeg,16));
+      if (i2) pegG.add(rod(pegPts[i2-1],pegPts[i2],0.045,mPeg));
+    }
+    k.add('pegc', pegG);
+
+    /* diselenide bridge */
+    var seG = new THREE.Group();
+    var seA = new THREE.Vector3(-1.72,0,0), seB = new THREE.Vector3(-1.3,0,0);
+    seG.add(rod(pegPts[pegPts.length-1], seA, 0.045, mPeg));
+    seG.add(ball(seA,0.2,mSe,20)); seG.add(ball(seB,0.2,mSe,20));
+    seG.add(rod(seA,seB,0.085,mSe));
+    k.add('disec', seG);
+
+    /* poly(Asp) backbone */
+    var bbG = new THREE.Group(), bbPts=[];
+    var n = 12;
+    for (var b=0;b<n;b++){ bbPts.push(new THREE.Vector3(-0.95 + b*0.52, (b%2?0.14:-0.14), 0)); }
+    bbG.add(rod(seB, bbPts[0], 0.05, mBb));
+    for (var b2=0;b2<n;b2++){
+      bbG.add(ball(bbPts[b2],0.145,mBb,18));
+      if (b2) bbG.add(rod(bbPts[b2-1],bbPts[b2],0.055,mBb));
+    }
+    /* side chains on alternating units */
+    var hydG = new THREE.Group(), doxG = new THREE.Group();
+    function doxMol(){
+      var g = new THREE.Group();
+      for (var t=0;t<3;t++){
+        var bx = new THREE.Mesh(new THREE.BoxGeometry(0.32,0.1,0.3), mDox);
+        bx.position.x = (t-1)*0.28; g.add(bx);
+      }
+      g.add(ball(new THREE.Vector3(0.48,-0.18,0.04),0.12,mDoxS,14));
+      return g;
+    }
+    for (var s=1;s<n;s+=2){
+      var top = bbPts[s];
+      var c1 = new THREE.Vector3(top.x, top.y-0.34, 0.04);
+      var c2 = new THREE.Vector3(top.x, top.y-0.64, 0.02);
+      bbG.add(rod(top,c1,0.045,mSide)); bbG.add(ball(c1,0.095,mSide,14));
+      bbG.add(rod(c1,c2,0.045,mSide));  bbG.add(ball(c2,0.095,mSide,14));
+      /* hydrazone C=N-NH : double rod + two nodes */
+      var h1 = new THREE.Vector3(top.x, top.y-0.95, 0), h2 = new THREE.Vector3(top.x, top.y-1.24, 0);
+      hydG.add(rod(c2,h1,0.042,mHyd));
+      hydG.add(ball(h1,0.125,mHyd,16)); hydG.add(ball(h2,0.125,mHyd,16));
+      hydG.add(rod(h1.clone().add(new THREE.Vector3(0,0,0.035)), h2.clone().add(new THREE.Vector3(0,0,0.035)), 0.028, mHyd));
+      hydG.add(rod(h1.clone().add(new THREE.Vector3(0,0,-0.035)), h2.clone().add(new THREE.Vector3(0,0,-0.035)), 0.028, mHyd));
+      var dm = doxMol();
+      dm.position.set(top.x, top.y-1.72, 0);
+      dm.rotation.set(0.2, (s%4===1? 0.35 : -0.3), 0.08);
+      doxG.add(dm);
+      hydG.add(rod(h2, new THREE.Vector3(top.x, top.y-1.52, 0), 0.042, mHyd));
+    }
+    k.add('backbone', bbG);
+    k.add('hyd', hydG);
+    k.add('doxc', doxG);
+
+    /* free SN-38 above the chain */
+    var snG = new THREE.Group();
+    function snMol(){
+      var g = new THREE.Group();
+      [[0,0,0],[0.26,0.02,0.06],[0.5,0.04,-0.06],[0.2,0.06,-0.22]].forEach(function(p){
+        var bx = new THREE.Mesh(new THREE.BoxGeometry(0.24,0.09,0.24), mSn);
+        bx.position.set(p[0],p[1],p[2]); bx.rotation.y = 0.45; g.add(bx);
+      });
+      return g;
+    }
+    [[-0.6,1.15,0.35],[1.45,1.35,-0.3],[3.4,1.1,0.4]].forEach(function(p,idx){
+      var m = snMol(); m.position.set(p[0],p[1],p[2]);
+      m.rotation.set(0.3+idx*0.4, idx*0.9, 0.15); snG.add(m);
+    });
+    k.add('sn38c', snG);
+
+    k.pin('uroc',    1, P.uro,   new THREE.Vector3(-6.1, 0.72, 0.1), 0.52);
+    k.pin('pegc',    2, P.peg,   new THREE.Vector3(-3.6, 0.6, 0.1), 0.52);
+    k.pin('disec',   3, P.dise,  new THREE.Vector3(-1.5, 0.6, 0.1), 0.52);
+    k.pin('backbone',4, P.core,  new THREE.Vector3(2.2, 0.68, 0.1), 0.52);
+    k.pin('hyd',     5, P.hyd,   new THREE.Vector3(0.68, -1.1, 0.35), 0.52);
+    k.pin('doxc',    6, P.dox,   new THREE.Vector3(2.75, -1.95, 0.35), 0.52);
+    k.pin('sn38c',   7, P.sn38,  new THREE.Vector3(1.6, 1.78, 0.1), 0.52);
+
+    var camera = new THREE.PerspectiveCamera(40, 1, 0.1, 200);
+    camera.position.set(-0.6, 1.7, 12.6);
+    return {scene:scene, camera:camera, reg:k.reg, pins:k.pins, target:new THREE.Vector3(-0.65,0,0),
+            spin:0.3, fitW:6.05, fitH:2.3, rotatable:true};
+  }
+
+  /* ---------- view management ---------- */
+  var built = {};
+  function getView(name){
+    if (!built[name]){
+      var v = name==='capsule' ? buildCapsule() : name==='nano' ? buildNano() : buildChain();
+      /* everything except the lights goes into one root group, so the scene can be
+         turned upright when the canvas is taller than it is wide (phones) */
+      var root = new THREE.Group();
+      v.scene.children.slice().forEach(function(o){ if (!o.isLight) root.add(o); });
+      v.scene.add(root);
+      v.root = root;
+      v.home = v.camera.position.clone();
+      v.homeDir = v.camera.position.clone().sub(v.target).normalize();
+      v.refD = v.camera.position.distanceTo(v.target);
+      v.fitDist = v.refD;
+      v.controls = new THREE.OrbitControls(v.camera, renderer.domElement);
+      v.controls.enableDamping = true;
+      v.controls.dampingFactor = 0.08;
+      v.controls.target.copy(v.target);
+      v.controls.enablePan = false;
+      v.controls.autoRotateSpeed = v.spin;
+      v.controls.enabled = false;
+      v.controls.update();
+      built[name] = v;
+    }
+    return built[name];
+  }
+
+  var current = 'capsule', focus = null, spinning = !reduced;
+  var raycaster = new THREE.Raycaster(), pointer = new THREE.Vector2();
+
+  function setFocus(id){
+    focus = id;
+    var reg = getView(current).reg;
+    Object.keys(reg).forEach(function(pid){
+      var active = !focus || pid === focus;
+      reg[pid].forEach(function(r){
+        var m = r.mat;
+        m.transparent = true;
+        var dim = m.isSpriteMaterial ? 0.22 : 0.07;
+        m.opacity = active ? r.opacity : Math.min(r.opacity, 1) * dim;
+        if ('emissiveIntensity' in m) m.emissiveIntensity = (active && focus) ? 0.3 : r.emissive;
+        if ('depthWrite' in m && m.isMeshStandardMaterial) m.depthWrite = active && r.opacity >= 1;
+        m.needsUpdate = true;
+      });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('.part'), function(el){
+      el.setAttribute('aria-pressed', el.dataset.part === focus ? 'true' : 'false');
+    });
+  }
+
+  function renderList(){
+    var v = VIEWS[current];
+    document.getElementById('panelTitle').textContent = v.title;
+    document.getElementById('scaleLabel').textContent = v.label;
+    document.getElementById('scaleSize').textContent = v.size;
+    var ul = document.getElementById('parts');
+    ul.innerHTML = '';
+    v.parts.forEach(function(p, i){
+      var li = document.createElement('li');
+      var btn = document.createElement('button');
+      btn.className = 'part'; btn.type = 'button';
+      btn.style.setProperty('--pc', p.color);
+      btn.dataset.part = p.id;
+      btn.setAttribute('aria-pressed','false');
+      btn.innerHTML = '<span class="num">'+(i+1)+'</span>'
+        + '<span class="pname">'+p.name+(p.chem?'<span class="chem">'+p.chem+'</span>':'')+'</span>'
+        + '<p class="pdesc">'+p.desc+'</p>';
+      btn.addEventListener('click', function(){
+        setFocus(focus === p.id ? null : p.id);
+      });
+      li.appendChild(btn); ul.appendChild(li);
+    });
+  }
+
+  function switchView(name){
+    getView(current).controls.enabled = false;
+    current = name;
+    var v = getView(name);
+    v.controls.enabled = true;
+    v.controls.autoRotate = spinning;
+    document.getElementById('view').setAttribute('aria-labelledby','tab-'+name);
+    Array.prototype.forEach.call(document.querySelectorAll('.tab'), function(t){
+      t.setAttribute('aria-selected', t.dataset.view === name ? 'true':'false');
+    });
+    renderList();
+    setFocus(null);
+    resize();
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('.tab'), function(t){
+    t.addEventListener('click', function(){ switchView(t.dataset.view); });
+  });
+  document.getElementById('spinBtn').addEventListener('click', function(){
+    spinning = !spinning; this.setAttribute('aria-pressed', spinning ? 'true':'false');
+    getView(current).controls.autoRotate = spinning;
+  });
+  document.getElementById('resetBtn').addEventListener('click', function(){
+    var v = getView(current);
+    v.camera.position.copy(v.home); v.controls.target.copy(v.effTarget || v.target); v.controls.update();
+  });
+  document.getElementById('allBtn').addEventListener('click', function(){ setFocus(null); });
+
+  /* picking */
+  var downPt = null;
+  canvas.addEventListener('pointerdown', function(e){ downPt = {x:e.clientX, y:e.clientY}; canvas.classList.add('grabbing'); });
+  canvas.addEventListener('pointerup', function(e){
+    canvas.classList.remove('grabbing');
+    if (!downPt) return;
+    var moved = Math.abs(e.clientX-downPt.x) + Math.abs(e.clientY-downPt.y);
+    downPt = null;
+    if (moved > 6) return;
+    var rect = canvas.getBoundingClientRect();
+    pointer.x = ((e.clientX-rect.left)/rect.width)*2 - 1;
+    pointer.y = -((e.clientY-rect.top)/rect.height)*2 + 1;
+    var v = getView(current);
+    raycaster.setFromCamera(pointer, v.camera);
+    var hits = raycaster.intersectObjects(v.scene.children, true);
+    for (var i=0;i<hits.length;i++){
+      var o = hits[i].object;
+      if (o.material && o.material.opacity < 0.1) continue;
+      if (o.userData && o.userData.part){ setFocus(o.userData.part === focus ? null : o.userData.part); return; }
+    }
+    setFocus(null);
+  });
+
+  /* canvas shape per view: elongated subjects get a taller box on phones and a
+     wider one on desktop, so the subject fills the frame instead of being clipped */
+  var SHAPE = {capsule:{narrow:1.12, wide:0.78}, nano:{narrow:1.0, wide:0.78}, chain:{narrow:1.44, wide:0.62}};
+
+  function fit(v, aspect){
+    var rot = !!v.rotatable && aspect < 0.98;
+    if (v.root) v.root.rotation.z = rot ? Math.PI/2 : 0;
+    var fw = rot ? v.fitH : v.fitW, fh = rot ? v.fitW : v.fitH;
+    var hf = Math.tan(v.camera.fov*Math.PI/360);
+    var d = Math.max(fh/hf, fw/(hf*aspect)) * 1.07;
+    /* the look-at point turns with the scene, so the subject stays centred */
+    var t = rot ? new THREE.Vector3(-v.target.y, v.target.x, v.target.z) : v.target.clone();
+    v.fitDist = d;
+    v.effTarget = t;
+    v.home = t.clone().add(v.homeDir.clone().multiplyScalar(d));
+    v.controls.minDistance = d*0.3;
+    v.controls.maxDistance = d*2.4;
+    var key = (rot?'r':'n') + Math.round(aspect*50);
+    if (v.lastKey !== key){
+      v.lastKey = key;
+      var cur = v.camera.position.clone().sub(v.controls.target);
+      if (cur.lengthSq() < 1e-6) cur = v.homeDir.clone();
+      v.controls.target.copy(t);
+      v.camera.position.copy(t).add(cur.normalize().multiplyScalar(d));
+      v.controls.update();
+    }
+  }
+
+  function resize(){
+    var box = canvas.parentElement;
+    var w = Math.max(1, Math.round(box.clientWidth));
+    var shape = SHAPE[current] || SHAPE.nano;
+    var ratio = w < 620 ? shape.narrow : shape.wide;
+    var capH = Math.max(300, Math.min(Math.round((window.innerHeight||700) * 0.72), 620));
+    var h = Math.max(260, Math.min(Math.round(w*ratio), capH));
+    if (Math.abs(box.clientHeight - h) > 1){ box.style.aspectRatio = 'auto'; box.style.height = h + 'px'; }
+    h = Math.max(1, Math.round(box.clientHeight));
+    renderer.setSize(w, h, false);
+    var v = getView(current);
+    v.camera.aspect = w/h; v.camera.updateProjectionMatrix();
+    fit(v, w/h);
+  }
+  if (window.ResizeObserver){ new ResizeObserver(resize).observe(document.getElementById('view')); }
+  window.addEventListener('resize', resize);
+  window.addEventListener('orientationchange', function(){ setTimeout(resize, 250); });
+
+  function loop(){
+    var v = getView(current);
+    v.controls.update();
+    /* keep the numbered pins at a constant size on screen, whatever the zoom or device */
+    var dist = v.camera.position.distanceTo(v.controls.target);
+    var f = Math.max(0.45, Math.min(2.6, dist / (v.refD || dist)));
+    for (var i=0;i<v.pins.length;i++){
+      var s = v.pins[i].base * f;
+      v.pins[i].sprite.scale.set(s, s, 1);
+    }
+    renderer.render(v.scene, v.camera);
+    requestAnimationFrame(loop);
+  }
+
+  if (window.matchMedia('(pointer: coarse)').matches){
+    document.getElementById('hint').innerHTML =
+      '<kbd>한 손가락</kbd> 회전 · <kbd>두 손가락</kbd> 확대 · <kbd>부분 탭</kbd> 설명';
+  }
+  getView('capsule').controls.enabled = true;
+  getView('capsule').controls.autoRotate = spinning;
+  document.getElementById('spinBtn').setAttribute('aria-pressed', spinning ? 'true':'false');
+  renderList();
+  resize();
+  loop();
+})();
+</script>
+</body>
+</html>
